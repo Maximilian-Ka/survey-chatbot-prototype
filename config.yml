@@ -1,0 +1,63 @@
+# The config recipe.
+# https://rasa.com/docs/rasa/model-configuration/
+
+# Configuration for Rasa NLU.
+# https://rasa.com/docs/rasa/nlu/components/
+
+recipe: default.v1
+
+
+language: en
+
+pipeline:
+  - name: SpacyNLP  # pre-trained language model used to retrieve word vectors (not case sensitive by default)
+    model: en_core_web_md
+  - name: SpacyTokenizer
+  - name: SpacyFeaturizer # Creates a vector representation of user message
+  - name: RegexFeaturizer
+  - name: LexicalSyntacticFeaturizer
+  - name: CountVectorsFeaturizer  # Creates bag-of-words representation of user messages, intents, and responses.
+  - name: CountVectorsFeaturizer
+    analyzer: "char_wb"
+    min_ngram: 1
+    max_ngram: 4
+  - name: DIETClassifier  # Dual Intent Entity Transformer used for intent classification and entity extraction
+    constrain_similarities: true
+    epochs: 130
+  - name: EntitySynonymMapper
+  - name: ResponseSelector  # relevant for retrival intent(s)
+    epochs: 90
+    constrain_similarities: true
+    retrieval_intent: chitchat
+  - name: FallbackClassifier  # triggers intent 'nlu_fallback'
+    threshold: 0.5
+    ambiguity_threshold: 0.1
+  # - name: "DucklingEntityExtractor"
+  #   # url of the running duckling server
+  #   url: "http://localhost:8000"
+  #   # dimensions to extract
+  #   dimensions: ["time"]
+  #   # allows you to configure the locale, by default the language is
+  #   # used
+  #   locale: "de_DE"
+  #   # if not set the default timezone of Duckling is going to be used
+  #   # needed to calculate dates from relative expressions like "tomorrow"
+  #   timezone: "Europe/Berlin"
+
+
+# Configuration for Rasa Core.
+# https://rasa.com/docs/rasa/core/policies/
+policies:
+  - name: MemoizationPolicy
+    max_history: 3  # good: 4
+  - name: RulePolicy
+    core_fallback_threshold: 0.3
+    core_fallback_action_name: "action_default_fallback"  # triggered when action confidence below threshhold
+    enable_fallback_prediction: True
+  - name: UnexpecTEDIntentPolicy    # https://rasa.com/docs/rasa/policies#unexpected-intent-policy
+    max_history: 6
+    epochs: 65
+  - name: TEDPolicy # https://rasa.com/docs/rasa/policies/#ted-policy,  https://rasa.com/docs/rasa/policies/#data-augmentation
+    max_history: 4s
+    epochs: 25
+    constrain_similarities: true

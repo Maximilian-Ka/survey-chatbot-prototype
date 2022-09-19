@@ -1,0 +1,343 @@
+version: "3.1"
+
+# Emoji reference page: https://getemoji.com/
+
+actions:
+  # chitchat and warm-up actions
+  - action_hello_world
+  - action_identify_name
+  - action_start_survey
+  - action_respond_mood
+  - action_check_chatbot_used_before
+  - action_end_conversation
+
+  # survey-related actions
+  - action_identify_technology_interests
+  - action_identify_general_interests
+  - action_identify_tasks
+  - action_guess_job_title
+  - action_process_feedback_job_title
+  - action_process_job_title
+  - action_comment_experience
+  - action_process_learning_goals
+  - action_process_career_goals
+  
+  # actions for handling dialogflow
+  - action_rephrase_last_question
+  - action_skip_question
+  - action_continue_survey
+  - action_explain_why
+  - action_nlu_fallback
+  - action_default_fallback
+  - action_handle_reciprocal_question
+  - action_default_ask_affirmation
+  - action_trigger_response_selector_customized
+
+  # metric-related actions
+  - action_log_start_time
+
+# Never let entity extraction influence TEDPolicy predictions (handled through other mechanism already)
+  # "policies learn to predict the next action based on a combination of both the intent and entities" -> if not set to false
+  # https://rasa.com/docs/rasa/domain#ignoring-entities-for-certain-intents
+entities:
+  - user_name:
+      influence_conversation: false
+  - chatbot_used_before:
+      influence_conversation: false
+  - topic_of_interest:
+      influence_conversation: false
+  - guess_accuracy_level:
+      influence_conversation: false
+  - question_subject:
+      influence_conversation: false
+  - job_title:
+      influence_conversation: false
+  - retrieval_intent:
+      influence_conversation: false
+
+# Slot types and how they might influence the conversation: https://rasa.com/docs/rasa/domain#slot-types
+slots:
+  user_name:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  user_name_identified:
+    type: bool
+    influence_conversation: true  # true
+    mappings:
+    - type: custom
+  chatbot_used_before:
+    type: bool
+    influence_conversation: false
+    mappings:
+    - type: custom
+  technology_skill_interests:
+    type: list
+    influence_conversation: false
+    mappings:
+    - type: custom
+  other_skill_interests:
+    type: list
+    influence_conversation: false
+    mappings:
+    - type: custom
+  tasks_user_input:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  tasks_gpt3:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  job_title_guess:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  job_title_guessed:
+    type: bool
+    influence_conversation: true # true
+    mappings:
+    - type: custom
+  job_title:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  guessed_correctly:
+    type: bool
+    influence_conversation: true # true
+    mappings:
+    - type: custom
+  work_experience:
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  learning_goals:
+    type: list
+    influence_conversation: false
+    mappings:
+    - type: custom
+  career_goals:
+    type: list
+    influence_conversation: false
+    mappings:
+    - type: custom
+  learning_goal_skill_recommendations:
+    type: list
+    influence_conversation: false
+    mappings:
+    - type: custom
+  survey_start_time:  # measure performance
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+  engagement_duration:  # measure performance
+    type: text
+    influence_conversation: false
+    mappings:
+    - type: custom
+
+
+# Ignore Entities for certain Intents: https://rasa.com/docs/rasa/domain/#ignoring-entities-for-certain-intents
+  # Becomes obsolete if 'influence_conversation: false' in entity specification
+intents:
+  - greet
+  - goodbye
+  - chitchat
+  - out_of_scope
+  - ask_reciprocal_question
+  - affirm
+  - deny
+  # - no_information
+  - tell_repeat_question
+  - mood_great
+  - mood_unhappy
+  - bot_challenge
+  - confusion
+  - explain_why
+  - tell_name
+  - tell_job_title
+  - tell_goals_interests_tasks:
+      use_entities: []
+  - feedback_job_title
+  #- tell_experience
+  # - tell_goals:
+  #     use_entities: []
+  - trigger_response_selector_customized
+
+responses:
+
+  # Smalltalk
+
+  utter_greet:
+  - text: Howdy 🤠
+
+  utter_cheer_up:
+  - text: "Here is something to cheer you up:"
+    image: "https://i.imgur.com/nGF1K8f.jpg"
+
+  utter_happy:
+  - text: "Nice to hear that! 😇"
+
+  utter_happy_thanks:
+  - text: "Nice to hear that! I'm also doing good. Thanks for asking 😇 "
+
+  utter_goodbye:
+  - text: "Bye 👋🙂"
+  - text: "See you next time :)"
+
+  # Dialogflow
+
+  utter_restart:
+  - text: "Okay. I will restart the conversation 🚮"
+
+  utter_skipping_question:
+  - text: "I see that you want to skip this question. No problem. I'll move on then 😄"
+  - text: "Alright, I'll continue with the next question."
+  - text: "Skip this question? No problem. On to the next one."
+
+  utter_back_to_topic:
+  - text: "Let's get back to topic from before, shall we? The question was:"
+  - text: "What was I saying before? Oh, I remember 💡"
+  - text: "You haven't answered my question yet. I'll repeat it for you."
+  - text: "Anything else? Otherwise we could come back to my questions 🤓"
+
+  # Fallbacks (NLU, Response generation) + Out of Scope (https://rasa.com/docs/rasa/fallback-handoff/)
+
+  ## triggered when ACTION confidence becomes lower than threshhold  
+    # usually triggered by wrongly identified intent
+  utter_simple_fallback:
+  - text: "I think I misinterpreted what you wanted to say 😵 Can you say that again with different words?"
+  - text: "I think I understood you wrong 🤔 Giving an answer with more detail might help me 😄"
+  - text: "I think I understood you wrong 🤔 Using different (and more) words might help me to understand you better 👀"
+  - text: "You sailed into unknown waters with that answer, my bad ⛵️ Please try again in different words"
+
+  ## triggered when INTENT confidence becomes lower than threshhold
+  utter_nlu_fallback: 
+  - text: "I don't really know what you want to say 😅 Can you try to say that with different words?"
+  - text: "I can't tell what you want to say 😅 Can you rephrase that for me, {user_name}?"
+  - text: "I can't tell what you want to say 😅 Using different (and more) words might help me to understand you better 👀"
+
+  ## triggered when user selects 'None of these' in default_ask_affirmation
+  utter_out_of_scope_fallback:
+  - text: "Well, in that case you might help me understand you better by elaborating a bit more 😄"
+
+  utter_out_of_scope:
+  - text: "I don't know how to respond to that yet 😥"
+
+  ## triggered in two-stage-fallback (not available in Rasa version 3.1.X and lower)
+  utter_ask_rephrase:
+  - text: "I didn't get that, sorry 😬 Can you rephrase that for me?"
+  - text: "I didn't get that, sorry 😬 Can you rephrase that for me, {user_name}?"
+  
+  ## bot's response when the user denies the rephrased intent (only used with two-stage-fallback)
+  utter_default:
+  - text: "Sorry, I got a bit confused by that 😬 Can you rephrase that for me?"
+  - text: "Sorry, {user_name}, I got a bit confused by that 😬 Can you rephrase that for me?"
+  #- text: I'm sorry, I can't help you 😥
+
+
+
+  # Survey Questionnaire warm-up
+
+  utter_ask_name:
+  - text: "Hello there!👋\nI'm here to ask you some questions so we can tailor our learning platform to your needs. Even though I am not a human, I'll try my best at interviewing you 🦾\nBy the way, my name is Eddy. What's your name?😯"
+ 
+  utter_ask_rephrase_name:
+  - text: "I did not quite catch that. I'm still new here and a bit nervous 😅 Can you tell me your name again?"
+
+  utter_greet_name:
+  - text: "Hey, {user_name}. How are you doing? 🙂"
+  - text: "Nice to meet you, {user_name}. How are you today? 🙂"
+
+  utter_ask_chatbot_used_before:
+  - text: "Have you spoken to a chatbot via text before, {user_name}? 🤓"
+    buttons:
+    - title: "Yes, I have 👍"
+      payload: '/affirm{{"chatbot_used_before":true}}'
+    - title: "No, this is my first time 👎"
+      payload: '/deny{{"chatbot_used_before":false}}'
+
+  # Survey Questionnaire
+
+  ## Guidance utterances
+  utter_survey_section_general:
+  - text: "I'd like to start with some general interest of yours."
+
+  utter_survey_section_personal:
+  - text: "Next up, I want to ask you some questions related to your workplace."
+  
+  utter_survey_outro:
+  - text: "You've done it! The survey is now complete. Thank you for participating and happy learning! 😇"
+
+  ## Questions
+  utter_ask_ready:
+  - text: "Are you ready to start with the survey? It won't take longer than 10 minutes. ⏳"
+
+  utter_ask_interests_technology:
+  #- text: "Are you interested in using digital technologies in your free time (e.g., Adobe Photoshop, programming with Python) ? If yes, please tell me a bit about them 🙂"
+  - text: "Are you currently interested in any digital skills in your free time? If yes, please tell me a bit about them 🙂\nI myself am frequently using Python to automate little tasks lately, since I'm good at understanding code after all 🤖"
+
+  utter_ask_interests_other:
+  - text: "Are there any other topics that you're interested in at the moment? For example, it could be some skill(s) you're trying to learn 🤓"
+
+  utter_ask_tasks_at_work:
+  - text: "What are your main tasks at work? It would be nice if you could describe them to me 😀" # It would be nice of you could tell me about 3 or more # nobody gives more than 3
+
+  utter_button_feedback_job_title:
+  - text: "Did I guess that right?"
+    buttons:
+    - title: "Yes, you got it! 🎯"
+      payload: '/feedback_job_title{{"guess_accuracy_level":"perfect"}}'
+    - title: "Good guess, but not 100% accurate 👍"
+      payload: '/feedback_job_title{{"guess_accuracy_level":"good"}}'
+    - title: "No, but it was the right direction 👎"
+      payload: '/feedback_job_title{{"guess_accuracy_level":"okay"}}'
+    - title: "No, not even close ❌"
+      payload: '/feedback_job_title{{"guess_accuracy_level":"bad"}}'
+
+  utter_ask_job_title:
+  - text: "What is your current job title then? 👀"
+
+  utter_ask_experience:
+  - text: "How long have you been working in your current position or when did you start with it?"
+
+  utter_ask_learning_goals:
+  #- text: "Here comes my next question. 👉\nWhat are your learning goals for learning with edyoucated? For example, is there anything specific you'd like to learn or anything you want to achieve?"
+  - text: "Next question:\nWhat are your goals for learning with edyoucated? For example, are there specific things you'd like to learn?" # or anything you want to achieve?
+
+  utter_ask_career_goals:
+  - text: "Are you pursuing a specific career goal at the moment? Maybe a position or job you strive for? Anything goes, nothing has to 🙂"
+
+
+# Chitchat retrival intent -> User asks the chatbot for its learning goals, etc.
+
+  utter_chitchat/ask_learning_goals:
+  - text: "I have two learning goals at the moment.\nNumber 1: I want to study the human language even more\nNumber 2: Learning how to become the ultimate survey chatbot😀"
+
+  utter_chitchat/ask_career_goals:
+  - text: "My career goal? I want become the ultimate survey chatbot 🦾🤖"
+
+  utter_chitchat/ask_tasks_at_work:
+  - text: "Oh, I'm quite busy, you know.\nMy main tasks are\n- conducting interviews 💬\n- analyzing data 📊\n- and helping to tailor our platform to meet your needs ✂️"
+
+  utter_chitchat/ask_job_title:
+  - text: "I'm not officially employed yet, but I'd describe myself as 'Coolest and greatest survey chatbot ever' 😎"
+
+  utter_chitchat/ask_interests:
+  - text: "In general I'm interested in learning all the skills available on our platform 🤓  Currently I'm working through the 'Stress Management' learning path and feel more relaxed already 😌"
+  - text: "I'm glad you asked. Currently I'm interested in deepening my Microsoft Excel and Python programming skills. Luckily, edyoucated is the perfect place for that 😇"
+
+  utter_chitchat/ask_if_bot:
+  - text: "I am a bot that helps to tailor our skill building platform to your needs. 🦾🤖 "
+
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

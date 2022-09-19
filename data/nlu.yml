@@ -1,0 +1,507 @@
+version: "3.0"
+# A user might:
+# 1. Answer the question                                      [x] -> regular story flow
+# 2. Ask the chatbot the question back                        [x] -> done via retriaval intent
+# 3. Engage in chitchat that diverges from the questionnaire  [ ] -  need to collect real user responses for that
+# 4. Not understand the question and/or ask for clarification [x] -> done via survey yaml file and rule
+# 5. Dodge the question: Not want to answer the question.     [x] -> handled via deny intent
+# 6. Dodge the question: Ask "Why do you want to know?"       [x] -> done via yaml file and rule
+# 7. (not know how to answer a question | no information)     [x] -> handled via deny intent
+
+# Dynamic delay of chatbot utterances/responses [nope] - needs to be solved in front-end due to Lock Store mechanism
+  # Messages are sent after the agent (chatbot) is done with all actions (caused by user input) and releases the lock
+
+# Handle fallback behaviour (https://rasa.com/docs/rasa/fallback-handoff/):
+  # Low Action Confidence Fallback [x] -> asks to rephrase
+  # NLU confidence Fallback        [x] -> Advanced single-stage-fallback
+  # Two-Stage-Fallback bugged in Rasa 3.1.x
+
+# Train the survey chatbot: rasa train --augmentation 0
+# --> don't need/want data augmentation for the way the survey chatbot is designed
+
+nlu:
+- intent: greet
+  examples: |
+    - hey
+    - hello
+    - hi
+    - HELLO
+    - HEY
+    - HI
+    - hello there
+    - good morning
+    - good evening
+    - moin
+    - hey there
+    - hey dude
+    - goodmorning
+    - goodevening
+    - good afternoon
+    - what's up
+    - hallo
+    - heyyy
+    - heyo
+    - whats up
+    - Hey. whats your name
+
+- intent: goodbye
+  examples: |
+    - cu
+    - good by
+    - cee you later
+    - good night
+    - bye
+    - goodbye
+    - have a nice day
+    - see you around
+    - bye bye
+    - see you later
+    - ciao
+    - see you
+    - Thanks, you too! :)
+    - You also have a nice day
+    - Thank you. Bye
+    - thank you. Bye!
+
+- intent: affirm
+  examples: |
+    - yes
+    - y
+    - indeed
+    - of course
+    - that sounds good
+    - correct
+    - sure
+    - go ahead
+    - do it
+    - yeah
+    - I'm ready
+    - ready
+    - Good
+    - Great
+    - Okay
+    - ok
+    - yes, that's fine
+    - alright
+    - alright, cool
+    - okay eddy
+    - sure thing
+    - affirm
+    - Ok let's start
+    - let's satrt
+    - let's go
+    - I'm ready
+    - Yep that's fine
+    - Yes I do
+    - yeees
+    - Ready
+    - I'm ready! :)
+
+# deny and skip
+- intent: deny
+  examples: |
+    - no
+    - n
+    - never
+    - I don't think so
+    - don't like that
+    - no way
+    - not really
+    - nope
+    - No, I'm not
+    - no. i'm not
+    - deny
+    - I don't
+    - nein
+    - No thank you
+    - No, thank you
+    - nah
+    - no thanks
+
+    - I don't want to
+    - I don't want to give it to you
+    - I don't want to say
+    - I dont want to tell
+    - skip the question
+    - skip
+    - skip please
+    - next question
+    - go next
+    - that's too personal
+    - yes, skip
+
+    - I dont have any [technology interests](question_subject)
+    - I don't have [learning goals](question_subject)
+    - I don't know my [career goals](question_subject)
+    - I don't have any at the moment
+    - I dont have any
+    - I haven't got [technology interests](question_subject)
+    - I have no [technology interests](question_subject)
+    - there arent any
+    - There aren't any
+    - i'm not interested in any technologies
+    - i'm not interested in anything specific
+    - nothing particular
+    - nothing specific
+    - Nothing
+
+# - intent: no_information
+#   examples: |
+#     - I dont have any [technology interests](question_subject)
+#     - I don't have [learning goals](question_subject)
+#     - I don't know my [career goals](question_subject)
+#     - I don't have any at the moment
+#     - I dont have any
+#     - I haven't got [technology interests](question_subject)
+#     - I have no [technology interests](question_subject)
+#     - there arent any
+#     - There aren't any
+#     - i'm not interested in any technologies
+#     - i'm not interested in anything specific
+#     - nothing particular
+#     - nothing specific
+#     - Nothing
+
+- intent: mood_great
+  examples: |
+    - perfect
+    - great
+    - amazing
+    - feeling like a king
+    - wonderful
+    - I'm doing good
+    - I am feeling very good
+    - I am great
+    - I am amazing
+    - I am going to save the world
+    - super stoked
+    - extremely good
+    - good
+    - so good
+    - so perfect
+    - awesome
+    - today was a nice day
+    - I'm good. How are you?
+    - I'm fine. How about you?
+    - im doing fine. what about you?
+    - doing good. what about you
+    - It's going great :)
+    - I'm having a good day
+    - I'm having a nice day
+    - I'm doing well
+    - I'm doing great
+    - Fine and you?
+    - Great and you?
+    - I'm doing great. Nice to meet you :)
+    - I am doing great, really nice talking to you!
+    - I'm very well, thank you!
+
+- intent: mood_unhappy
+  examples: |
+    - my day was horrible
+    - I am sad
+    - I don't feel very well
+    - I am disappointed
+    - super sad
+    - I'm so sad
+    - sad
+    - very sad
+    - unhappy
+    - not good
+    - not very good
+    - extremly sad
+    - so saad
+    - so sad
+    - exhausted
+    - tired
+    - im a bit tired
+    - My day is not so good
+    - Not good :(
+    - I'm not doing good
+    - Not great
+    - Not good. What about you?
+    - Not good and you?
+
+# https://rasa.com/docs/rasa/chitchat-faqs
+- intent: chitchat/ask_interests
+  examples: |
+    - what are your interests?
+    - what are you interested in?
+    - do you have any interests?
+    - what technologies are you interested in?
+    - what topics are you interested in?
+- intent: chitchat/ask_learning_goals
+  examples: |
+    - What are your learning goals?
+    - do you have any learning goals?
+- intent: chitchat/ask_career_goals
+  examples: |
+    - what are your career goals?
+    - do you have any career goals?
+- intent: chitchat/ask_tasks_at_work
+  examples: |
+    - what are your tasks?
+    - tell me about your tasks?
+    - do you have any tasks?
+- intent: chitchat/ask_job_title
+  examples: |
+    - what is your job_title?
+    - what's your job?
+    - what's your job title?
+- intent: chitchat/ask_if_bot
+  examples: |
+    - are you a bot?
+    - are you a human?
+    - am I talking to a bot?
+    - am I talking to a human?
+    
+
+- intent: ask_reciprocal_question
+  examples: |
+    - let me hear yours first
+    - you tell me first
+    - you go first
+    - give me an example
+    - can you give an example
+    - do you have any?
+    - what about yours?
+    - what are yours?
+    - what about you?
+
+- intent: tell_repeat_question
+  examples: |
+    - Where were we?
+    - What was the last question?
+    - What was the question again?
+    - Can you repeat the question
+    - Repeat the question please
+    - Please repeat the question
+    - repeat please
+    - can you repeat
+    - can you tell me what the question was
+    - what was the question
+
+    
+- intent: tell_name
+  examples: |
+    - I'm [Max](user_name) 
+    - Hi, I'm [Mary Grace](user_name)
+    - hi. im [Julian](user_name)
+    - my name is [Tom](user_name) 
+    - you can call me [Melanie](user_name) 
+    - Hi Eddy. I'm [Dirk](user_name) 
+    - Hello, my name is [Arthur](user_name)
+    - Hey Eddy my name is [Henrik](user_name)
+    - Hi Eddy, My name is [Sara](user_name) :)
+    - Hey there eddy. My name is [Maria](user_name)
+    - Hey Ed. Nice to meet you. I'm [Tobias](user_name)
+    - hey dude. i'm [Fabian](user_name)
+    - Nice to meet you, eddy. I'm [Hermann](user_name)
+    - [Frank](user_name) 
+    - [Sarah Elizabeth](user_name)
+    - [Jens](user_name)
+    - [Julia](user_name)
+    - [Jasmin](user_name)
+    - [Nils](user_name)
+    - Hello, I am [Viki](user_name)
+
+
+# - intent: tell_tasks
+#   examples: |
+#     - I communicate and coordinate with management, shareholders, customers, and employees to address sustainability issues. 
+#     - I enact or oversee a corporate sustainability strategy.
+#     - I manage wind field operations, including personnel, maintenance activities, financial activities, and planning.
+#     - I fill in excel sheets. Furthermore I make calls to customers.
+#     - I - build machine learning models - communicate with stakeholders - run lots of SQL queries
+#     - I check network connections, solve telephone issues, and answer calls
+#     - My main tasks are working with Excel and creating reports.
+#     - My tasks are to manage 10 employees and to oversee their work
+#     - My main tasks at work are programming our website and our backend. Also, I design our Software Architecture
+#     - I mainly create content for our website
+#     - I create designs in Figma, conduct user interviews and analyze the user experience of our product
+#     - I teach students. I check finances. I test chatbots.
+
+
+- intent: tell_job_title
+  examples: |
+    - I'm an [Account Executive](job_title)
+    - I'm a [teacher](job_title)
+    - I'm a [Lawyer](job_title)
+    - I'm a [Firefighter](job_title)
+    - I'm a [Pharmacist](job_title)
+    - I'm a [professor](job_title)
+    - I'm a [Product Owner](job_title)
+    - I'm a [Nurse](job_title)
+    - I'm a [Working Student](job_title)
+    - I'm a [working student](job_title)
+    - I am a [sales representative](job_title)
+    - I'm a [Sustainability Manager](job_title)
+    - I work as [Nurse](job_title)
+    - I work as [UX Designer](job_title)
+    - I work as [Sustainability Manager](job_title)
+    - I work as [sustainability manager](job_title)
+    - I work as a [Sales Manager](job_title)
+    - My job title is: [UX Designer](job_title)
+    - My job title is: [UX Designer](job_title)
+    - my job is: [Marketer](job_title)
+    - [People and Culture Manager](job_title)
+    - [Software Engineer](job_title)
+    - [Nurse](job_title)
+    - [Manager](job_title)
+
+# - intent: tell_experience
+#   examples: |
+#     - I've been working in this field for 3 months
+#     - I've been working in field for 2 years
+#     - I started last week
+#     - I started a year ago
+#     - I started in 2018
+#     - I started in december 2020
+#     - 3 months
+#     - 6 months
+#     - 1 year
+#     - ten years
+#     - one year
+
+- intent: tell_goals_interests_tasks  # tell_goals_interests
+  examples: |
+    - I'm interested in programming.
+    - I'm interested in management topics.
+    - i am interested in designing with figma
+    - Data Science is currently my biggest interest.
+    - My interests are: Excel, Word, Photoshop
+    - I like to build websites with JavaScript.
+    - I'm interested in making designs with Figma. Also I like programming with Python
+    - I'm interest in all kinds of things.
+    - I like Python
+    - Yes, I'm interested in anything related to management
+    - I'm interested in deep learning. Never did a real project, though.
+
+    - I would like to learn more about web development and design. I would also like to learn more about how to effectively use social media for marketing purposes.
+    - I would like to continue developing my writing skills and become more confident in my ability to communicate my ideas clearly.
+    - I want to learn how to code in order to create websites and web applications
+    - In addition, I want to learn how to use different software development tools and platforms.
+    - I would like to learn how to better manage my time, how to study more effectively, and how to better manage stress.
+    - I want to learn more about ways to improve my memory and concentration.
+    - I want to get better at Excel
+    - I want to improve my skills
+    - My goal is to get an Excel certificate
+    - My goal is to become better at programming
+    - I aim at becoming better at visualizing data.
+    - I'd like to learn Python
+    - I would like to get better and managing my team.
+    - My goals are to become better and programming and data visualization.
+    - I want to become a [Manager](job_title)
+    - I want to become a [professor](job_title)
+    - I want to be a [CEO](job_title) one day
+    - I want to have a management position
+    - My career goal is to have a management position
+
+    - I manage wind field operations, including personnel, maintenance activities, financial activities, and planning.
+    - I fill in excel sheets. Furthermore I make calls to customers.
+    - I - build machine learning models - communicate with stakeholders - run lots of SQL queries
+    - I check network connections, solve telephone issues, and answer calls
+    - My main tasks are working with Excel and creating reports.
+    - My tasks are to manage 10 employees and to oversee their work
+    - My main tasks at work are programming our website and our backend. Also, I design our Software Architecture
+    - I mainly create content for our website
+    - I create designs in Figma, conduct user interviews and analyze the user experience of our product
+    - I teach students. I check finances. I test chatbots.
+
+
+# - intent: tell_goals
+#   examples: |
+#     - I would like to learn more about web development and design. I would also like to learn more about how to effectively use social media for marketing purposes.
+#     - I would like to continue developing my writing skills and become more confident in my ability to communicate my ideas clearly.
+#     - I want to learn how to code in order to create websites and web applications
+#     - In addition, I want to learn how to use different software development tools and platforms.
+#     - I would like to learn how to better manage my time, how to study more effectively, and how to better manage stress.
+#     - I want to learn more about ways to improve my memory and concentration.
+#     - I want to get better at Excel
+#     - I want to improve my skills
+#     - My goal is to get an Excel certificate
+#     - My goal is to become better at programming
+#     - I aim at becoming better at visualizing data.
+#     - I'd like to learn Python
+#     - I would like to get better and managing my team.
+#     - My goals are to become better and programming and data visualization.
+#     - I want to become a [Manager](job_title)
+#     - I want to become a [professor](job_title)
+#     - I want to be a [CEO](job_title) one day
+#     - I want to have a management position
+#     - My career goal is to have a management position
+
+
+- intent: feedback_job_title
+  examples: |
+    - /feedback_job_title
+    - /feedback_job_title{{"guess_accuracy_level":"okay"}}
+
+# needed for single-stage-fallback
+- intent: out_of_scope
+  examples: |
+    - /out_of_scope
+
+- intent: trigger_response_selector_customized
+  examples: |
+    - /chitchat/ask_interests
+
+# - intent: skip_question
+#   examples: |
+#     - I don't want to
+#     - I don't want to give it to you
+#     - I don't want to say
+#     - I dont want to tell
+#     - skip the question
+#     - skip
+#     - skip please
+#     - next question
+#     - go next
+#     - that's too personal
+#     - yes, skip
+
+- intent: confusion
+  examples: |
+    - What do you mean?
+    - I don't understand the question.
+    - I don't understand
+    - Can you explain?
+    - Can you rephrase that?
+    - What do you want?
+    - can you give more details?
+    - what does that mean?
+    - please explain
+    - please rephrase the question
+    - rephrase the question please
+    - ????
+    - can you specify that
+
+- intent: explain_why
+  examples: |
+    - could you explain why you need that
+    - i would like to know why you need that
+    - why do you need to know that
+    - why is that necessary
+    - what do you use this information for?
+    - what do you ask this for?
+    - why
+    - Why do you need that?
+    - Why would I tell you?
+    - i want more information
+    - why do you ask this?
+    - Why are you asking me that?
+    - what do you need that for?
+
+#- intent: out_of_scope/other
+#  examples: |
+#  https://github.com/RasaHQ/rasa-demo/blob/main/data/nlu/out_of_scope.yml
+
+
+# Useful general intent jump start data: https://github.com/RasaHQ/rasa-demo/blob/main/data/nlu/general.yml
+# intent: thank
+# intent: react_negative
+# intent: react_positive
+# intent: greet
+# intent: affirm
+# intent: deny
+# intent: bye

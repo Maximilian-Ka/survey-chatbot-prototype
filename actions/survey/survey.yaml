@@ -1,0 +1,27 @@
+# All items starting with 'utter_ask' are interpreted as survey question.
+# This file should be kept up to date with the questions of the chatbot questionnaire
+
+# explain_why: Bot utterance after intent 'explain_why' is triggered
+# rephrased_question: Bot utterance after intent 'confusion' is triggered
+
+survey:
+  - name: utter_ask_chatbot_used_before
+  - name: utter_survey_section_general
+  - name: utter_ask_interests_technology
+    explain_why: By knowing your interests, we can better tell what you might already know or like.
+    rephrased_question: Are you using or learning any digital skills in your free time? If yes, I'd like to hear a bit about them 😊
+  - name: utter_ask_interests_other
+    explain_why: By knowing your interests, we can better tell what you might already know or like.
+  - name: utter_survey_section_personal
+  - name: utter_ask_tasks_at_work
+    rephrased_question: What are your usual tasks at work you create the most impact with?
+    explain_why: Judging by your tasks we can better tell what you might already know.
+  - name: utter_ask_job_title
+    explain_why: Judging by your job title we can better tell what you might already know.
+  # - name: utter_ask_experience
+  - name: utter_ask_learning_goals
+    explain_why: We can take your learning goals into consideration to make even more relevant recommendations for you.
+    rephrased_question: Are there any specific skills or technologies you're trying to learn with edyoucated? If yes, please tell me a bit about them 😄
+  - name: utter_ask_career_goals
+    explain_why: By knowing your career goals, we can try support you with that by recommending the most relevant content to you.
+  - name: utter_survey_outro

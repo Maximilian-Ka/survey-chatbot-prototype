@@ -1,0 +1,81 @@
+version: "3.0"
+
+# Useful info:
+
+# By default, rules will wait for the next user message when finished with the last step:
+  # Every rule implicitly includes a prediction for `action_listen` as last step.
+  # This means that Rasa Open Source will wait for the next user message.
+
+# Dialogue turns that only appear as rules in the training data and do not appear 
+# in stories will be ignored by ML-only policies like TEDPolicy at prediction time.
+
+rules:
+
+- rule: Say goodbye anytime the user says goodbye
+  steps:
+  - intent: goodbye
+  - action: utter_goodbye
+
+# similar to rule 'Respond to chitchat', but without specific topic in reciprocal question
+- rule: Give a playful or informative answer anytime the user asks a the chatbot for a topic of interest (reciprocal question)
+  steps:
+  - intent: ask_reciprocal_question
+  - action: action_handle_reciprocal_question
+  - action: utter_back_to_topic
+  - action: action_continue_survey
+
+- rule: Respond to chitchat (via retrieval intent)
+  steps:
+    - intent: chitchat
+    - action: utter_chitchat
+    - action: utter_back_to_topic
+    - action: action_continue_survey
+
+- rule: Rephrase the question anytime the user can't answer the question or wants clarification
+  steps:
+    - intent: confusion
+    - action: action_rephrase_last_question
+
+- rule: Give an answer anytime the user wants to know why a certain question was asked
+  steps:
+    - intent: explain_why
+    - action: action_explain_why
+
+- rule: Repeat the last survey question anytime the user asks the bot to repeat
+  steps:
+    - intent: tell_repeat_question
+    - action: action_continue_survey
+
+- rule: Trigger response selector from button payload
+  steps:
+  - intent: trigger_response_selector_customized
+  - action: action_trigger_response_selector_customized
+
+# Solution for better single-stage-fallback
+  # adapted from https://towardsdatascience.com/handling-chatbot-failure-gracefully-466f0fb1dcc5
+- rule: Single stage fallback | ask user to choose what they meant
+  steps:
+  - intent: nlu_fallback
+  - action: action_default_ask_affirmation
+
+- rule: Single stage fallback | call default fallback if user is not ok
+  steps:
+  - action: action_default_ask_affirmation
+  - intent: out_of_scope
+  - action: action_default_fallback
+
+# - rule: Prompt fallback promt anytime the user says something out of scope.
+#   steps:
+#     - intent: out_of_scope/other
+#     - action: utter_out_of_scope
+
+#### The Two Stage NLU Fallback is bugged in Rasa 3.1.x (latest compatible versions with Rasa X)
+#### and therefore can't be used...
+# # Two-Stage- NLU Fallback  
+# - rule: Implementation of the Two-Stage-Fallback
+#   steps:
+#   - intent: nlu_fallback
+#   - action: action_two_stage_fallback
+#   - active_loop: action_two_stage_fallback
+
+

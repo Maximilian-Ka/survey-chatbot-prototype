@@ -1,0 +1,194 @@
+version: "3.0"
+
+# https://rasa.com/docs/rasa/training-data-format#stories
+
+stories:
+
+- story: HappyPath Introduction - Be greeted by the user and ask for their name
+  steps:
+  - intent: greet
+  - action: action_log_start_time
+  - action: utter_ask_name
+  - or:
+    - intent: tell_name
+    - intent: greet
+  - action: action_identify_name
+  - slot_was_set:
+    - user_name_identified: true
+  - slot_was_set:
+      - user_name
+  - checkpoint: checkpoint_greet_name
+
+- story: UnhappyPath Introduction - Learner name cant be identified -> re-ask for name
+  steps:
+  - intent: greet
+  - action: action_log_start_time
+  - action: utter_ask_name
+  - or:
+    - intent: tell_name
+    - intent: greet
+  - action: action_identify_name
+  - slot_was_set:
+     - user_name_identified: false
+  - action: utter_ask_rephrase_name
+  - intent: tell_name
+  - action: action_identify_name
+  - slot_was_set:
+    - user_name_identified: true
+  - slot_was_set:
+      - user_name
+  - checkpoint: checkpoint_greet_name
+
+### 1 story snippet
+- story: HappyPath Warm up - Warm-up part of questionnaire
+  steps:
+  - checkpoint: checkpoint_greet_name
+  - action: utter_greet_name
+  - or:
+    - intent: affirm
+    - intent: mood_great
+    - intent: mood_unhappy
+  - action: action_respond_mood
+  - action: utter_ask_chatbot_used_before
+  - or:
+    - intent: affirm 
+    - intent: deny
+  - action: action_check_chatbot_used_before
+  - slot_was_set:
+    - chatbot_used_before
+  - action: utter_ask_ready
+  - or:
+    - intent: affirm
+    - intent: deny
+  - action: action_start_survey # End warm-up and start survey
+  - action: utter_survey_section_general
+  - action: utter_ask_interests_technology
+  - checkpoint: check_finished_warm_up
+
+### 1 story snippet
+- story: Learner interests (technology, general)
+  steps:
+  - checkpoint: check_finished_warm_up
+  - or:
+    - intent: deny
+    #- intent: no_information # now incorporated into 'deny' intent
+    - intent: tell_goals_interests_tasks
+    #- intent: tell_interests
+  - action: action_identify_technology_interests
+  - slot_was_set:
+    - technology_skill_interests
+  - action: utter_ask_interests_other
+  - or:
+    - intent: deny
+    #- intent: no_information # now incorporated into 'deny' intent
+    - intent: tell_goals_interests_tasks
+    #- intent: tell_interests
+  - action: action_identify_general_interests
+  - slot_was_set:
+    - other_skill_interests
+  - action: utter_survey_section_personal
+  - checkpoint: check_identified_interests
+
+### 3 story snippets
+- story: Tasks and Job Title - Happy path -  User gives enough tasks and job title guessed correctly
+  steps:
+  - checkpoint: check_identified_interests
+  - action: utter_ask_tasks_at_work
+  - or:
+    - intent: tell_goals_interests_tasks
+    - intent: deny
+  - action: action_identify_tasks
+  - action: action_guess_job_title
+  - slot_was_set:
+    - job_title_guessed: true
+  - slot_was_set:
+    - job_title_guess
+  - action: utter_button_feedback_job_title
+  - intent: feedback_job_title
+  - action: action_process_feedback_job_title
+  - slot_was_set:
+    - guessed_correctly: true
+  - checkpoint: ask_for_learning_goals
+
+- story:  Tasks and Job Title - Alternative path -  User gives enough tasks, job title NOT guessed correctly
+  steps:
+  - checkpoint: check_identified_interests
+  - action: utter_ask_tasks_at_work
+  - or:
+    - intent: tell_goals_interests_tasks
+    - intent: deny
+  - action: action_identify_tasks
+  - action: action_guess_job_title
+  - slot_was_set:
+    - job_title_guessed: true
+  - action: utter_button_feedback_job_title
+  - intent: feedback_job_title
+  - action: action_process_feedback_job_title
+  - slot_was_set:
+    - guessed_correctly: false
+  - action: utter_ask_job_title
+  - or:
+    - intent: tell_job_title
+    #- intent: mood_great # remove once tell_job_title is stable enough
+    #- intent: deny -> presumably not likely here
+  - action: action_process_job_title
+  - slot_was_set:
+    - job_title
+  - checkpoint: ask_for_learning_goals
+
+- story:  Tasks and Job Title - Unhappy path -  User gives enough tasks, can't make guess for job title
+  steps:
+  - checkpoint: check_identified_interests
+  - action: utter_ask_tasks_at_work
+  - or:
+    - intent: tell_goals_interests_tasks
+    - intent: deny
+  - action: action_identify_tasks
+  - action: action_guess_job_title
+  - slot_was_set:
+    - job_title_guessed: false
+  - action: utter_ask_job_title
+  - or:
+    - intent: tell_job_title
+    #- intent: mood_great # remove once tell_job_title is stable enough
+    - intent: deny
+  - action: action_process_job_title
+  - slot_was_set:
+    - job_title
+  - checkpoint: ask_for_learning_goals
+  #- action: utter_ask_learning_goals
+  #- action: utter_ask_experience
+
+### 1 story snippet
+- story:  Learning goals - Happy Path
+  steps:
+  - checkpoint: ask_for_learning_goals
+  - action: utter_ask_learning_goals
+  - or:
+    - intent: tell_goals_interests_tasks
+    - intent: deny
+  - action: action_process_learning_goals
+  - slot_was_set:
+    - learning_goals
+  - action: utter_ask_career_goals
+  - or:
+    - intent: tell_goals_interests_tasks
+    - intent: deny
+  - action: action_process_career_goals
+  - action: utter_survey_outro
+  - action: action_end_conversation
+
+
+### Excluded due to too high computational effort
+
+# - story:  Working experience - Happy Path
+#   steps:
+#   - action: utter_ask_experience
+#   - or:
+#     - intent: tell_experience
+#     - intent: deny
+#     #- intent: no_information # now incorporated into 'deny' intent
+#   - action: action_comment_experience
+#   - slot_was_set:
+#     - work_experience
+#   - action: utter_ask_learning_goals
