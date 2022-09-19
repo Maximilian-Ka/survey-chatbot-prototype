@@ -1,0 +1,35 @@
+on:
+  push:
+    branches:
+      - main
+    paths:
+    - 'actions/**'
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build Action Server image and upgrade Rasa Enterprise deployment
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - id: action_server
+      name: Build an action server with a custom actions
+      #uses: RasaHQ/rasa-action-server-gha@main
+      uses: RasaHQ/rasa-action-server-gha@v1.0.3
+      # Full list of parameters: https://github.com/RasaHQ/action-server-gha/tree/master#input-arguments
+      with:
+        docker_image_name: 'your_docker_image_name'
+        docker_registry_login: 'your_docker_registry_login'
+        docker_registry_password: 'your_docker_registry_password'
+        # More details about github context:
+        # https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#github-context
+        #
+        # github.sha - The commit SHA that triggered the workflow run
+        
+        docker_image_tag: action_server_image # ADJUST to your image tag
+        requirements_file: 'actions/requirements.txt'
+        
+        rasa_sdk_version: "3.1.2"
+        
+        dockerfile: 'actions/Dockerfile'
