@@ -46,7 +46,7 @@
 This is the GitHub repository for the _survey chatbot prototype_ that was built in the context of the master thesis titled ''_Collecting personal learner information in digital education: 
 From tedious questionnaire to entertaining chatbot experience_'', written by Maximilian Kania at the University of Muenster.
 
-In the thesis, it was aimed to build a _fun and interactive chatbot survey_ to elicit high-quality from information from users on a learning platform, while providing a good user experience. Thereby, the survey chatbot approach is supposed to substitute a boring, regular web survey.
+In the thesis, it was aimed to build a _fun and interactive chatbot survey_ to elicit high-quality from information from users on a learning platform, while providing a good user experience. Thereby, the survey chatbot approach is supposed to substitute for a boring, regular web survey.
 
 Overall, the primary tool that was used to build the chatbot is [Rasa](https://rasa.com/) but other technologies were employed as well (see below).
 
@@ -98,7 +98,7 @@ _Below you can find instructions on installing and setting up the prototype loca
     ```
 5. Additionally, install rasa and spaCy:
     ```sh
-    pip3 install rasa==3.1.2
+    pip3 install rasa==3.1.0
     ```
     ```sh
     pip install -U spacy

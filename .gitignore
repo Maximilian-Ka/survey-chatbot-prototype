@@ -8,11 +8,9 @@
 /httpRequests/
 
 # folders
-edyoucated/
 models/
 .rasa/
 .idea/
-NLG/
 .rasa/*
 .idea/*
 .rasa\
