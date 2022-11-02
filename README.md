@@ -93,14 +93,14 @@ _Below you can find instructions on installing and setting up the prototype loca
    ```
 3. Create and activate a virtual Python environment.
 4. Install wheel.
-  ```sh
-  pip install wheel==0.37.1
-  ```
-4. Install the required packages (this might take a while): 
+    ```sh
+    pip install wheel==0.37.1
+    ```
+5. Install the required packages (this might take a while): 
     ```sh
     pip install -r requirements.txt
     ```
-5. Additionally, install rasa and spaCy:
+6. Additionally, install rasa and spaCy.
     ```sh
     pip3 install rasa==3.1.0
     ```
@@ -110,19 +110,23 @@ _Below you can find instructions on installing and setting up the prototype loca
     ```sh
     python -m spacy download en_core_web_md
     ```
-6. Enter your OpenAI API key in `actions/NLG/.env`
+7. Download stopwords for the nltk package.
+    ```sh
+    python -m nltk.downloader stopwords
+    ```
+8. Enter your OpenAI API key in `actions/NLG/.env`.
     ```py
     OPENAI_API_KEY=<your_API_key>
     ```
-7. Train the chatbot model
+9. Train the chatbot model.
     ```sh
     rasa train --augmentation 0
     ```
-8. Run the survey chatbot in the CLI.
+10. Run the survey chatbot in the CLI...
     ```sh
     rasa shell
     ```
-9. and don't forget to run the action server in a separate terminal.
+11. and don't forget to run the action server in a separate terminal.
     ```sh
     rasa run actions
     ```
