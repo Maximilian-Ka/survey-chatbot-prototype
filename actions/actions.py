@@ -988,7 +988,8 @@ class ActionDefaultAskAffirmation(Action):
             "tell_goals_interests_tasks":"Tell me about yourself",
             "skip_question":"Skip to the next question",
             "confusion":"Ask for me to rephrase the question",
-            "explain_why":"Ask for an explanation"
+            "explain_why":"Ask for an explanation",
+            "tell_repeat_question":"Want me to repeat the question"
         }
 
         full_intent = str((tracker.latest_message.get("response_selector", {}).get("chitchat", {}).get("response", {}).get("intent_response_key", {})))
