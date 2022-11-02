@@ -86,12 +86,16 @@ To get a local copy of the _survey chatbot prototype_ up and running follow thes
 
 _Below you can find instructions on installing and setting up the prototype locally (communicate with the chatbot via the CLI)._
 
-1. Get an account and API Key at [https://openai.com/](https://openai.com/) to be able to use _GPT-3_ (you start with a good amount of free credits that last three months).
+1. Get an OpenAI account and API Key at [https://openai.com/](https://openai.com/) to be able to use _GPT-3_ (you start with a good amount of free credits that expire after three months).
 2. Clone this repository.
    ```sh
    git clone https://github.com/Maximilian-Ka/survey-chatbot-prototype.git
    ```
 3. Create and activate a virtual Python environment.
+4. Install wheel.
+  ```sh
+  pip install wheel==0.37.1
+  ```
 4. Install the required packages (this might take a while): 
     ```sh
     pip install -r requirements.txt
