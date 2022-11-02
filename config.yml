@@ -32,17 +32,6 @@ pipeline:
   - name: FallbackClassifier  # triggers intent 'nlu_fallback'
     threshold: 0.5
     ambiguity_threshold: 0.1
-  # - name: "DucklingEntityExtractor"
-  #   # url of the running duckling server
-  #   url: "http://localhost:8000"
-  #   # dimensions to extract
-  #   dimensions: ["time"]
-  #   # allows you to configure the locale, by default the language is
-  #   # used
-  #   locale: "de_DE"
-  #   # if not set the default timezone of Duckling is going to be used
-  #   # needed to calculate dates from relative expressions like "tomorrow"
-  #   timezone: "Europe/Berlin"
 
 
 # Configuration for Rasa Core.
@@ -58,6 +47,6 @@ policies:
     max_history: 6
     epochs: 65
   - name: TEDPolicy # https://rasa.com/docs/rasa/policies/#ted-policy,  https://rasa.com/docs/rasa/policies/#data-augmentation
-    max_history: 4s
+    max_history: 4
     epochs: 25
     constrain_similarities: true
