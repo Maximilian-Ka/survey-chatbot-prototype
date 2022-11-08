@@ -8,91 +8,125 @@
 import logging
 from typing import Any, Text, Dict, List, Tuple
 import os
-import pandas as pd
-
-from rasa_sdk import Action, Tracker
-from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.events import SlotSet, UserUtteranceReverted, ConversationPaused
-
-from actions.helper import init_survey, find_last_chatbot_question_in_survey, init_skills_df, delay_dispatcher_utterance, _find_latest_bot_question
-
-from actions.NLG.gpt3_connector import GPT3Connector
-from actions.evaluation.metrics import PerformanceEvaluator
-
 from time import sleep
-from copy import copy
 import spacy
 import re
 from datetime import datetime
 import random
+from copy import copy
 
+import pandas as pd
+
+from rasa_sdk import Action, Tracker
+from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.events import SlotSet, UserUtteranceReverted
+
+from actions.helper import init_survey, find_last_chatbot_question_in_survey, init_skills_df, delay_dispatcher_utterance, _find_latest_bot_question
+from actions.NLG.gpt3_connector import GPT3Connector
+from actions.evaluation.metrics import PerformanceEvaluator
+from actions.extraction.extractor import extract_strings_from_text
+    
+CHATBOT_NAMES = ["Eddy", "eddy", "Edy", "edy", "ed", "Ed"]
+
+def init_skills_from_dataframe(skill_domain: str, skills_df: pd.DataFrame) -> List[str]:
+
+    if skill_domain=="emsi":
+        skills: List[str] = skills_df["emsi_skill_title_normalized"].tolist()
+
+    elif skill_domain=="onet":
+        skills: List[str] = skills_df["title_normalized"].tolist()
+
+    elif skill_domain=="edyoucated":
+        skills: List[str] = skills_df["skill_titles_normalized"].tolist()
+        abbreviations = skills_df["skill_title_abbreviation"].tolist()
+        abbreviations = [x for x in abbreviations if x is not None]
+
+        skills.extend(abbreviations)
+        skills = [x for x in skills if x == x]  # eliminate np.nan values
+    else:
+        raise ValueError("invalid skill_domain specified as argument")
+
+    return skills
+    
 def init_skills_and_extract(
     user_input:str, 
-    filename:str="emsi_technology_skills.csv", 
-    skill_domain:str="emsi",
-    cutoff:int=90
+    filename:str = "emsi_technology_skills.csv", 
+    skill_domain:str = "emsi",
+    cutoff:int = 90
     ) -> Tuple[List[str], pd.DataFrame, List[str], List[str]]:
     """ Initializes a dataframe with relevant skills to extract skills from the latest user message.
     
     Args:
-        filename: Default, 'edyoucated_skills.csv', or 'onet_alternate_titles_normalized.csv'
-        skill_domain: Either 'emsi' or 'edyoucated' or 'onet'
+        filename: CSV file with skills: e.g., 'edyoucated_skills.csv' or 'onet_alternate_titles_normalized.csv'
+        skill_domain: Either 'emsi' or 'edyoucated' or 'onet', dependent on skill CSV file
+        cutoff: cutoff value for fuzzy string matching
     """
-    from actions.extraction.extractor import extract_strings_from_text
-    from copy import copy
-
-    skills_df, skills = None, None
-    if skill_domain=="emsi":
-        skills_df = init_skills_df(filename=filename)
-        skills = skills_df["emsi_skill_title_normalized"].tolist()
-
-    elif skill_domain=="onet":
-        skills_df = init_skills_df(filename=filename)
-        skills = skills_df["title_normalized"].tolist()
-
-    elif skill_domain=="edyoucated":
-        skills_df = init_skills_df(filename=filename)
-        skills = skills_df["skill_titles_normalized"].tolist()
-        abbreviations = skills_df["skill_title_abbreviation"].tolist()
-        abbreviations = [x for x in abbreviations if x is not None]
-        skills.extend(abbreviations)
-        # eliminate np.nan values
-        skills = [x for x in skills if x == x]
+    
+    skills_df = init_skills_df(filename=filename)
+    skills = init_skills_from_dataframe(skill_domain, skills_df)
 
     # Preprocess latest user input and extract skills
     results = extract_strings_from_text(user_input, skills, cutoff=cutoff)
 
-    # put identified skills in list
+    identified_skills = get_identified_skills_from_result(results)
+
+    # Bring identified skills into nice format
+    if identified_skills:
+        identified_skills_normalized = copy(identified_skills)
+        identified_skills = reformat_identified_skills(skill_domain, skills_df, identified_skills)
+
+    return identified_skills, skills_df, skills, identified_skills_normalized
+
+def reformat_identified_skills(skill_domain, skills_df, identified_skills):
+    """ Reformat result based on origin of skills. """
+    if skill_domain=="emsi":
+        # get the unnormalized version of each skill
+        identified_skills = skills_df[skills_df['emsi_skill_title_normalized'].isin(identified_skills)]["emsi_skill_title"].tolist()
+        # Remove information in parentheses and trailing whitespace
+        identified_skills = [re.sub("[\(\[].*?[\)\]]", "", skill).strip() for skill in identified_skills]
+
+    elif skill_domain=="onet":
+        identified_skills = skills_df[skills_df['title_normalized'].isin(identified_skills)]["title"].tolist()
+        identified_skills = [re.sub("[\(\[].*?[\)\]]", "", skill).strip() for skill in identified_skills]
+
+    elif skill_domain=="edyoucated":
+        # get the unnormalized version of each skill (prevent duplicates just in case)
+        identified_skills_v1 = skills_df[skills_df['skill_titles_normalized'].isin(identified_skills)]["skill_titles"].tolist()
+        identified_skills_v2 = skills_df[skills_df['skill_title_abbreviation'].isin(identified_skills)]["skill_titles"].tolist()
+        identified_skills = list(set(identified_skills_v1.extend(identified_skills_v2)))
+
+    return identified_skills
+
+def get_identified_skills_from_result(results: List[List[dict]]) -> List[str]:
     identified_skills = []
+
     while results:
         match = results.pop(0)
         identified_skills.append(match["match"]) # append the matched target skill
     logging.info(f"--- Found {len(identified_skills)} matching skills ---")
 
-    # Bring identified skills into nice format
-    identified_skills_normalized = copy(identified_skills)
-    if identified_skills:
-        if skill_domain=="emsi":
-            # get the unnormalized version of each skill
-            identified_skills = skills_df[skills_df['emsi_skill_title_normalized'].isin(identified_skills)]["emsi_skill_title"].tolist()
-            # Remove information in parentheses and trailing whitespace
-            identified_skills = [re.sub("[\(\[].*?[\)\]]", "", skill).strip() for skill in identified_skills]
+    return identified_skills
 
-        elif skill_domain=="onet":
-            identified_skills = skills_df[skills_df['title_normalized'].isin(identified_skills)]["title"].tolist()
-            identified_skills = [re.sub("[\(\[].*?[\)\]]", "", skill).strip() for skill in identified_skills]
 
-        elif skill_domain=="edyoucated":
-            # get the unnormalized version of each skill (prevent duplicates just in case)
-            identified_skills_v1 = skills_df[skills_df['skill_titles_normalized'].isin(identified_skills)]["skill_titles"].tolist()
-            identified_skills_v2 = skills_df[skills_df['skill_title_abbreviation'].isin(identified_skills)]["skill_titles"].tolist()
-            identified_skills = list(set(identified_skills_v1.extend(identified_skills_v2)))
-    else:
-        pass
 
-    return identified_skills, skills_df, skills, identified_skills_normalized
+def extract_skills_from_user_input(tracker: Tracker) -> Tuple(List[str], List[str]):
 
-def _is_any_skill_in_tags(tags:str, skills:List[str]) -> bool:
+    identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
+            tracker_latest_user_message(tracker), filename="emsi_skills.csv")
+        
+    # Sad path - no skills could be identified -> try lower cutoff (experimental)
+    if not identified_skills:
+        identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
+                tracker_latest_user_message(tracker), filename="emsi_skills.csv", skill_domain="emsi", cutoff=87)
+
+    # if still no skills identified
+    if not identified_skills:
+        identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
+                tracker_latest_user_message(tracker), filename="edyoucated_skills.csv", skill_domain="edyoucated", cutoff=90)
+            
+    return identified_skills, identified_skills_normalized
+
+def _is_any_skill_in_tags(tags: str, skills: List[str]) -> bool:
     """ Helper function for ActionProcessLearningGoals. 
     
     Args:
@@ -103,7 +137,7 @@ def _is_any_skill_in_tags(tags:str, skills:List[str]) -> bool:
             return True
     return False
 
-def tracker_latest_user_message(tracker:Tracker) -> str:
+def tracker_latest_user_message(tracker: Tracker) -> str:
     """ Substitute for 'tracker.latest_message["text"]'. Ignores messages that start with / """
     events = tracker.events
     latest_user_input = tracker.latest_message["text"]
@@ -116,7 +150,7 @@ def tracker_latest_user_message(tracker:Tracker) -> str:
 
     return latest_user_input
 
-def _contains_skip_intent_keyword(tracker:Tracker) -> bool:
+def _contains_skip_intent_keyword(tracker: Tracker) -> bool:
     """ Check if latest user message contains keywords that indicates intent to skip. """
     user_message = tracker_latest_user_message(tracker)
     user_message = user_message.lower()
@@ -127,13 +161,14 @@ def _contains_skip_intent_keyword(tracker:Tracker) -> bool:
     else:
         return False
 
-def _contains_no_information_intent_keyword(tracker:Tracker) -> bool:
-    """ Check if latest user message contains keywords that indicates intent to skip. """
+def _contains_no_information_intent_keyword(tracker: Tracker) -> bool:
+    """ Check if latest user message contains keywords that indicate intent to skip. """
     user_message = tracker_latest_user_message(tracker)
     user_message = user_message.lower()
 
-    skip_keywords = ["dont have", "don't have", "havent got", "haven't got", "there arent any", "there aren't any",
-    "i'm not interested", "i am not interested", "nothing"]
+    skip_keywords = ["dont have", "don't have", "havent got", 
+                    "haven't got", "there arent any", "there aren't any",
+                    "i'm not interested", "i am not interested", "nothing"]
 
     if any(skip_keyword in user_message for skip_keyword in skip_keywords):
         return True
@@ -155,7 +190,7 @@ class ActionHelloWorld(Action):
 
         return []
 class ActionLogStartTime(Action):
-    """ Store Start Time of survey in slot for evaluation later on. """
+    """ Store start time of survey in slot for evaluation later on."""
 
     def name(self) -> Text:
         return "action_log_start_time"
@@ -178,13 +213,11 @@ class ActionIdentifyUserName(Action):
             tracker: Tracker,
             domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
 
-        chatbot_names = ["Eddy", "eddy", "Edy", "edy", "ed", "Ed"]
-
         user_message = tracker_latest_user_message(tracker)
 
         # try to get name from DIETClassifier output
         name = next(tracker.get_latest_entity_values("user_name"), None)
-        if name and name not in chatbot_names:
+        if name and name not in CHATBOT_NAMES:
             name = name.title()
             return [SlotSet(key = "user_name", value = name), SlotSet(key = "user_name_identified", value = True)]
 
@@ -200,7 +233,7 @@ class ActionIdentifyUserName(Action):
 
             if len(names) == 1:
                 user_name = names[0]
-                if user_name in chatbot_names:
+                if user_name in CHATBOT_NAMES:
                     logging.info("Only found chatbot's name in user meesage.")
                     return [SlotSet(key = "user_name_identified", value = False)]
                 else:
@@ -209,7 +242,7 @@ class ActionIdentifyUserName(Action):
                     return [SlotSet(key = "user_name", value = user_name), SlotSet(key = "user_name_identified", value = True)]
 
             elif len(names) > 1:
-                names = [name for name in names if name not in chatbot_names]
+                names = [name for name in names if name not in CHATBOT_NAMES]
 
                 name = names[0].title()
                 logging.info(f"Identified name {name}")
@@ -233,52 +266,46 @@ class ActionIdentifyTechnologyInterest(Action):
         sleep(3)
         latest_user_intent = tracker.get_intent_of_latest_message()
 
-        if latest_user_intent == "deny" or latest_user_intent == "no_information":
-            if latest_user_intent == "deny" and _contains_skip_intent_keyword(tracker):
+        if latest_user_intent == "deny":
+            if _contains_skip_intent_keyword(tracker):
                 dispatcher.utter_message(response="utter_skipping_question")
             else:
                 dispatcher.utter_message(text = "No particular technology interests? No problem 👌")
             return [SlotSet(key = "technology_skill_interests", value = [])]
-        else:
-            identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                tracker_latest_user_message(tracker), filename="emsi_skills.csv")
-            
-            # Sad path - no skills could be identified -> try lower cutoff (experimental)
-            if not identified_skills:
-                identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                    tracker_latest_user_message(tracker), filename="emsi_skills.csv", skill_domain="emsi", cutoff=87)
-            # if still no skills identified
-            if not identified_skills:
-                identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                    tracker_latest_user_message(tracker), filename="edyoucated_skills.csv", skill_domain="edyoucated", cutoff=90) 
-            # Happy path - skills could be identified
-            if identified_skills:
-                skills_copy = identified_skills.copy()
-                # Comment on one of the identified skills using GPT-3
-                more_than_one = True if len(identified_skills) >= 2 else False
-                conn = GPT3Connector()
-                comment = conn.gpt3_comment_technology_skill(skills_copy[0], more_than_one_skill=more_than_one)
-                comment_on_skill = "If you ask me, " + comment
 
-                tech_savvy = "You seem to be quite tech-savvy 😎\n"
-                if len(identified_skills) == 1:
-                    text_message = f"You're interested in {identified_skills[0]}?😯\n" + comment_on_skill #I should get into that too 😀"
-                elif len(identified_skills) == 2:
-                    text_message = f"I see that you're interested in {identified_skills[0]} and {identified_skills[1]} 🤓\n" + tech_savvy + comment_on_skill
-                else:
-                    last_skill = identified_skills.pop()
-                    skills = ', '.join(identified_skills)
-                    text_message = f"I see that you're interested in {skills} and {last_skill}. You might be more tech-savvy than me... a robot 🤯\n" + comment_on_skill
+        identified_skills, identified_skills_normalized = extract_skills_from_user_input(tracker)
 
-                dispatcher.utter_message(text=text_message)
-                # TODO: Integrate business integration capability by also mapping to edyoucated ontology
-                return [SlotSet(key = "technology_skill_interests", value = identified_skills_normalized)]
+        # Happy path - skills could be identified
+        if identified_skills:
+            skills_copy = identified_skills.copy()
+            # Comment on one of the identified skills using GPT-3
+            more_than_one = True if len(identified_skills) >= 2 else False
+            conn = GPT3Connector()
+            comment = conn.gpt3_comment_technology_skill(skills_copy[0], more_than_one_skill=more_than_one)
+            comment_on_skill = "If you ask me, " + comment
 
-            # Unhappy path - no skills could be identified
+            tech_savvy = "You seem to be quite tech-savvy 😎\n"
+            if len(identified_skills) == 1:
+                text_message = f"You're interested in {identified_skills[0]}?😯\n" + comment_on_skill
+            elif len(identified_skills) == 2:
+                text_message = (f"I see that you're interested in {identified_skills[0]} and {identified_skills[1]} 🤓\n" 
+                                + tech_savvy + comment_on_skill)
             else:
-                text="Thanks for sharing!😇\nThat doesn't ring a bell with me right now, but I'll make sure to read up this and get back to you! 🤓 "
-                dispatcher.utter_message(text=text)
-                return [SlotSet(key = "technology_skill_interests", value = [])]
+                last_skill = identified_skills.pop()
+                skills = ', '.join(identified_skills)
+                text_message = (f"I see that you're interested in {skills} and {last_skill}. "
+                                "You might be more tech-savvy than me... a robot 🤯\n" + comment_on_skill)
+
+            dispatcher.utter_message(text=text_message)
+            # TODO: Integrate business integration capability by also mapping to edyoucated ontology
+            return [SlotSet(key = "technology_skill_interests", value = identified_skills_normalized)]
+
+        # Unhappy path - no skills could be identified
+        else:
+            text=("Thanks for sharing!😇\nThat doesn't ring a bell with me right now, "
+                    "but I'll make sure to read up this and get back to you! 🤓 ")
+            dispatcher.utter_message(text=text)
+            return [SlotSet(key = "technology_skill_interests", value = [])]
         
 
 class ActionIdentifyGeneralInterests(Action):
@@ -291,8 +318,7 @@ class ActionIdentifyGeneralInterests(Action):
             tracker: Tracker,
             domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
         
-        delay_dispatcher_utterance(domain, latest_user_message=tracker_latest_user_message(tracker))
-        
+        sleep(3)
         latest_user_intent = tracker.get_intent_of_latest_message()
         tech_interests = tracker.get_slot(key="technology_skill_interests")
 
@@ -313,29 +339,22 @@ class ActionIdentifyGeneralInterests(Action):
             return [SlotSet(key = "other_skill_interests", value = [])]
 
         else:
-            identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                tracker_latest_user_message(tracker), filename="emsi_skills.csv")
-            
-            # Sad path - no skills could be identified -> try lwoer cutoff (experimental)
-            if not identified_skills:
-                identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                    tracker_latest_user_message(tracker), filename="emsi_skills.csv", skill_domain="emsi", cutoff=87)
-            # if still no skills identified
-            if not identified_skills:
-                identified_skills, _, _, identified_skills_normalized = init_skills_and_extract(
-                    tracker_latest_user_message(tracker), filename="edyoucated_skills.csv", skill_domain="edyoucated", cutoff=90) 
+            identified_skills, identified_skills_normalized = extract_skills_from_user_input(tracker)
+
             # Happy path - skills could be identified
             if identified_skills:
-                skills_copy = identified_skills.copy()
                 # dispatcher.utter_message(text = "Oh yeah, I know some of these 😯")
                 if len(identified_skills) == 1:
-                    text_message = f"You're interested in {identified_skills[0]}? Sounds cool, maybe I should get into that too 😄"
+                    text_message = (f"You're interested in {identified_skills[0]}?" 
+                                    "Sounds cool, maybe I should get into that too 😄")
                 elif len(identified_skills) == 2:
-                    text_message = f"You're interested in {identified_skills[0]} and {identified_skills[1]}? That sounds cool, maybe I should get into these too 😄"
+                    text_message = (f"You're interested in {identified_skills[0]} and {identified_skills[1]}? "
+                                    "That sounds cool, maybe I should get into these too 😄")
                 else:
                     last_skill = identified_skills.pop()
                     skills = ', '.join(identified_skills)
-                    text_message = f"You're interested in {skills} and {last_skill}? That sounds like you're an interesting person 😀"
+                    text_message = (f"You're interested in {skills} and {last_skill}? "
+                                    "That sounds like you're an interesting person 😀")
 
                 text_message = text_message + "\nBy the way, I'll try to find some nice recommendations fitting your interests while we continue the interview. I'll tell you about the results once we're done 😀"
                 dispatcher.utter_message(text=text_message)
@@ -344,10 +363,11 @@ class ActionIdentifyGeneralInterests(Action):
                 
             # Unhappy path - no skills could be identified
             else:
-                text="Interesting!\nI don't think I can recommend any of our learning content related to that to you right away but maybe in the future 😄"
+                text=("Interesting!\nI don't think I can recommend any of our learning content "
+                      "related to that to you right away but maybe in the future 😄")
                 dispatcher.utter_message(text=text)
-                # TODO: Ask the user to rephrase?
                 return [SlotSet(key = "other_skill_interests", value = [])]
+
 
 class ActionIdentifyTasks(Action):
     """ Extract tasks from user input (with GPT-3) as bullet pointed list. """
@@ -360,6 +380,8 @@ class ActionIdentifyTasks(Action):
             domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
         
         latest_user_intent = tracker.get_intent_of_latest_message()
+        latest_user_message = tracker_latest_user_message(tracker)
+
         if latest_user_intent == "deny":
             if _contains_skip_intent_keyword(tracker):
                 dispatcher.utter_message(response="utter_skipping_question")
@@ -369,13 +391,10 @@ class ActionIdentifyTasks(Action):
             SlotSet(key="tasks_gpt3", value="")]
 
         conn = GPT3Connector()
-        latest_user_message = tracker_latest_user_message(tracker)
-
         tasks = conn.gpt3_summarize_tasks(latest_user_message)
         
-
         return [SlotSet(key="tasks_user_input", value=tracker_latest_user_message(tracker)),
-        SlotSet(key="tasks_gpt3", value=tasks)]
+                SlotSet(key="tasks_gpt3", value=tasks)]
 
 class ActionGuessJobTitle(Action):
     """ Guess job title based on tasks at work (with GPT-3). """
@@ -402,7 +421,6 @@ class ActionGuessJobTitle(Action):
         # TODO: Validate Job Title with O*NET list?
 
         if job_title_guess:
-            #dispatcher.utter_message("That's was a though one, but I think I've got it 💡")
             vowels = ["a","e","i","o","u"]
             article = "an" if job_title_guess[0].lower() in vowels else "a"
 
@@ -442,7 +460,7 @@ class ActionProcessFeedbackJobTitle(Action):
             dispatcher.utter_message(text="Yeah, I thought so 😅")
         elif guess_accuracy_level =="bad":
             dispatcher.utter_message(text="Well, I tried 🙈")
-        elif not guess_accuracy_level:
+        else:
             pass
 
         return [SlotSet(key="guessed_correctly", value=False)]
@@ -461,12 +479,13 @@ class ActionProcessJobTitle(Action):
         logging.info("Processing job title...")
         latest_user_intent = tracker.get_intent_of_latest_message()
 
-        if latest_user_intent == "deny" or latest_user_intent == "no_information":
-            if latest_user_intent == "deny" and _contains_skip_intent_keyword(tracker):
+        if latest_user_intent == "deny":
+            if _contains_skip_intent_keyword(tracker):
                 dispatcher.utter_message(response="utter_skipping_question")
-            else:
+            elif _contains_no_information_intent_keyword(tracker):
                 dispatcher.utter_message(text = "Alright then, keep your secrets 🧙")
             return [SlotSet(key = "job_title", value = "")]
+                
         else:
             job_title = next(tracker.get_latest_entity_values("job_title"), None)
 
@@ -492,7 +511,6 @@ class ActionProcessJobTitle(Action):
                 positive_comment:str = conn.gpt3_comment_job_title(job_title)
 
                 text = f"You're {article} {job_title}? Awesome! {positive_comment}"
-
                 dispatcher.utter_message(text)
                 return [SlotSet(key="job_title", value=job_title)]
             else:
